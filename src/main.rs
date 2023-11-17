@@ -1,7 +1,6 @@
 use chrono::{DateTime, Utc};
 use image::DynamicImage;
-use num_format::{Buffer, Locale};
-use num_traits::Float;
+
 use printpdf::{
     Color, Image, ImageTransform, ImageXObject, IndirectFontRef, Line, Mm, PdfDocument,
     PdfLayerReference, Point, Px, Rgb,
@@ -39,7 +38,6 @@ struct Transaction {
 #[derive(Debug, Deserialize)]
 struct Payload {
     pdf_name: String,
-    account_no: String,
     transactions: Vec<Transaction>,
 }
 
@@ -49,11 +47,6 @@ struct Summation {
     total_deposits: f64,
     total_withdrawal: f64,
     total_interest: f64,
-}
-
-fn num_truncate<T: Float>(number: T) -> T {
-    let factor: T = T::from(100.0).unwrap();
-    return (number * factor).trunc() / factor;
 }
 
 fn round(x: f64, decimals: u32) -> f64 {
@@ -87,17 +80,15 @@ pub extern "C" fn generate_pdf(payload: *const c_char) {
     let total_withdrawal: f64 = transactions.iter().map(|t| t.w_amount).sum();
     let total_interest: f64 = transactions.iter().map(|t| t.i_amount).sum();
     //totalpages
-    let x = if data_len <= 28 {
+
+    let total_pages: i64 = if data_len <= 28 {
         1
     } else {
-        let pages = ((data_len - 28 + 1) as f64 / 35.0).ceil() as i64;
-        println!("pages in {}", pages);
-        let total_pages = pages + 1;
-        println!("pages out {}", total_pages);
-        total_pages
+        let pages = ((data_len - 28) as f64 / 35.0).ceil() as i64 + 1;
+        pages
     };
 
-    println!("pages {}", x);
+    println!("pages {}", total_pages);
 
     let margin_top = Mm(10.0);
     let margin_bottom = Mm(10.0);
@@ -116,7 +107,7 @@ pub extern "C" fn generate_pdf(payload: *const c_char) {
         .add_external_font(File::open("assets/fonts/Lato/Lato-Bold.ttf").unwrap())
         .unwrap();
 
-    for i in 0..x {
+    for i in 0..total_pages {
         let current_layer: PdfLayerReference = if i == 0 {
             doc.get_page(page).get_layer(layer)
         } else {
@@ -147,7 +138,7 @@ pub extern "C" fn generate_pdf(payload: *const c_char) {
                 &default_font,
                 &bold_font,
                 first_page_trans,
-                if x == 1 { true } else { false },
+                if total_pages == 1 { true } else { false },
                 Summation {
                     total_running_bal,
                     total_deposits,
@@ -158,7 +149,7 @@ pub extern "C" fn generate_pdf(payload: *const c_char) {
             );
         }
 
-        if i > 0 {
+        if i >= 1 {
             let logo = load_logo();
             logo.add_to_layer(
                 current_layer.clone(),
@@ -172,15 +163,18 @@ pub extern "C" fn generate_pdf(payload: *const c_char) {
             );
 
             current_layer.use_text(
-                format!("page {}/{}", i + 1, x),
+                format!("page {}/{}", i + 1, total_pages),
                 7.0,
                 usable_width - Mm(0.00),
                 usable_height + Mm(10.0),
                 &default_font,
             );
 
-            let skipped = if i == 1 { 28 } else { 35 };
-
+            let skipped = if i == 1 {
+                28
+            } else {
+                (28 + 35 * i - 1) as usize
+            };
             let trans: Vec<Transaction> = transactions
                 .iter()
                 .skip(skipped)
@@ -194,7 +188,7 @@ pub extern "C" fn generate_pdf(payload: *const c_char) {
                 &default_font,
                 &bold_font,
                 trans,
-                if i + 1 == x { true } else { false },
+                if i + 1 == total_pages { true } else { false },
                 Summation {
                     total_running_bal,
                     total_deposits,
@@ -363,14 +357,14 @@ fn gen_table(
         Cow::Borrowed("Running Balance"),
     ]];
 
-    let mut sum_data: Vec<Vec<Cow<str>>> = vec![vec![
+    let sum_data: Vec<Vec<Cow<str>>> = vec![vec![
         Cow::Borrowed("Summations"),
         Cow::Borrowed(""),
         Cow::Borrowed(""),
         Cow::Owned(format!("{}", round(sums.total_deposits, 2))),
         Cow::Owned(format!("{}", round(sums.total_interest, 2))),
-        Cow::Owned(format!("{}", round(sums.total_withdrawal, 2))),
-        Cow::Owned(format!("{}", round(sums.total_taxs, 2))),
+        Cow::Owned(format!("{}", round(sums.total_withdrawal.abs(), 2))),
+        Cow::Owned(format!("{}", round(sums.total_taxs.abs(), 2))),
         Cow::Owned(format!("{}", round(sums.total_running_bal, 2))),
     ]];
 
@@ -457,6 +451,19 @@ fn gen_table(
                 current_layer.use_text(cell_data.to_string(), 8.0, Mm(x) + Mm(5.0), Mm(y), font);
                 current_layer.set_outline_color(Color::Rgb(gray.clone()));
                 current_layer.add_line(line.clone());
+
+                if row_index + 1 == data.len() && !summations {
+                    let b_y = line_y - row_height;
+                    let bottom_points = vec![
+                        (Point::new(Mm(table_start_x), Mm(b_y)), false),
+                        (Point::new(Mm(table_start_x + 190.0), Mm(b_y)), false),
+                    ];
+                    let bottom_line = Line {
+                        points: bottom_points,
+                        is_closed: false,
+                    };
+                    current_layer.add_line(bottom_line.clone());
+                }
             }
         }
     }
@@ -465,7 +472,7 @@ fn gen_table(
     let last_row_index = data.len();
 
     if summations {
-        for (row_index, row) in sum_data.iter().enumerate() {
+        for (_row_index, row) in sum_data.iter().enumerate() {
             for (col_index, cell_data) in row.iter().enumerate() {
                 let x = table_start_x
                     + column_widths[..col_index].iter().sum::<f32>()
@@ -507,4 +514,5 @@ fn gen_table(
     }
 }
 
+#[allow(dead_code)]
 fn main() {}
