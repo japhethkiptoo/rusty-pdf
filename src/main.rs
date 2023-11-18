@@ -118,6 +118,9 @@ pub extern "C" fn generate_pdf(payload: *const c_char) {
 
         page_footer(current_layer.clone(), usable_width, &default_font);
 
+        let first_page_size = 28;
+        let page_size = 35;
+
         if i == 0 {
             //top-header
             top_header(
@@ -131,7 +134,7 @@ pub extern "C" fn generate_pdf(payload: *const c_char) {
                 transaction_one,
             );
             let first_page_trans: Vec<Transaction> =
-                transactions.iter().take(28).cloned().collect();
+                transactions.iter().take(first_page_size).cloned().collect();
             gen_table(
                 current_layer.clone(),
                 h - 73.0,
@@ -170,15 +173,14 @@ pub extern "C" fn generate_pdf(payload: *const c_char) {
                 &default_font,
             );
 
-            let skipped = if i == 1 {
-                28
-            } else {
-                (28 + 35 * i - 1) as usize
-            };
-            let trans: Vec<Transaction> = transactions
+            let trans_data: Vec<Transaction> =
+                transactions.iter().skip(first_page_size).cloned().collect();
+            let start_index = page_size * (i - 1) as usize;
+
+            let trans: Vec<Transaction> = trans_data
                 .iter()
-                .skip(skipped)
-                .take(35)
+                .skip(start_index)
+                .take(page_size)
                 .cloned()
                 .collect();
 
