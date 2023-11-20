@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
 use image::DynamicImage;
 
+use numfmt::Formatter;
 use printpdf::{
     Color, Image, ImageTransform, ImageXObject, IndirectFontRef, Line, Mm, PdfDocument,
     PdfLayerReference, Point, Px, Rgb,
@@ -359,15 +360,20 @@ fn gen_table(
         Cow::Borrowed("Running Balance"),
     ]];
 
+    let mut f = Formatter::new()
+        .separator(',')
+        .unwrap()
+        .precision(numfmt::Precision::Decimals(2));
+
     let sum_data: Vec<Vec<Cow<str>>> = vec![vec![
         Cow::Borrowed("Summations"),
         Cow::Borrowed(""),
         Cow::Borrowed(""),
-        Cow::Owned(format!("{}", round(sums.total_deposits, 2))),
-        Cow::Owned(format!("{}", round(sums.total_interest, 2))),
-        Cow::Owned(format!("{}", round(sums.total_withdrawal.abs(), 2))),
-        Cow::Owned(format!("{}", round(sums.total_taxs.abs(), 2))),
-        Cow::Owned(format!("{}", round(sums.total_running_bal, 2))),
+        Cow::Owned(format!("{}", f.fmt2(sums.total_deposits))),
+        Cow::Owned(format!("{}", f.fmt2(sums.total_interest))),
+        Cow::Owned(format!("{}", f.fmt2(sums.total_withdrawal.abs()))),
+        Cow::Owned(format!("{}", f.fmt2(sums.total_taxs.abs()))),
+        Cow::Owned(format!("{}", f.fmt2(sums.total_running_bal))),
     ]];
 
     for transaction in transactions.iter() {
@@ -378,33 +384,26 @@ fn gen_table(
 
         let amount = trans.amount.clone();
 
-        let safe_amount = round(amount, 2);
-
         let deposit = if trans_type == "PURCHASE" {
-            format!("{:.2}", safe_amount)
+            format!("{}", f.fmt2(amount))
         } else {
             "".to_string()
         };
 
         let withdrawal = if trans_type == "WITHDRAWAL" {
-            format!("{:.2}", safe_amount)
+            format!("{}", f.fmt2(amount))
         } else {
             "".to_string()
         };
 
         let interest = if trans_type == "INTEREST" {
-            format!("{:.2}", safe_amount)
+            format!("{}", f.fmt2(amount))
         } else {
             "".to_string()
         };
 
         let tax_amount = trans.taxamt.clone();
-
-        let safe_tax_amount = round(tax_amount, 2);
-
         let running_balance = trans.running_balance.clone();
-
-        let safe_r_bal = round(running_balance, 2);
 
         data.push(vec![
             Cow::Owned(trans_id),
@@ -413,8 +412,8 @@ fn gen_table(
             Cow::Owned(deposit),
             Cow::Owned(interest),
             Cow::Owned(withdrawal),
-            Cow::Owned(format!("{:.2}", safe_tax_amount)),
-            Cow::Owned(format!("{:.2}", safe_r_bal)),
+            Cow::Owned(format!("{}", tax_amount)),
+            Cow::Owned(format!("{}", running_balance)),
         ]);
     }
 
