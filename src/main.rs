@@ -50,11 +50,6 @@ struct Summation {
     total_interest: f64,
 }
 
-fn round(x: f64, decimals: u32) -> f64 {
-    let y = 10i32.pow(decimals) as f64;
-    (x * y).round() / y
-}
-
 #[no_mangle]
 pub extern "C" fn generate_pdf(payload: *const c_char) {
     let (w, h) = (210.0, 297.0); //A4
@@ -205,7 +200,7 @@ pub extern "C" fn generate_pdf(payload: *const c_char) {
 
     doc.with_conformance(printpdf::PdfConformance::X3_2003_PDF_1_4)
         .save(&mut BufWriter::new(
-            File::create(format!("storage/{}.pdf", pdf_name)).unwrap(),
+            File::create(format!("storage/{}-temp.pdf", pdf_name)).unwrap(),
         ))
         .unwrap();
 }
@@ -412,8 +407,8 @@ fn gen_table(
             Cow::Owned(deposit),
             Cow::Owned(interest),
             Cow::Owned(withdrawal),
-            Cow::Owned(format!("{}", tax_amount)),
-            Cow::Owned(format!("{}", running_balance)),
+            Cow::Owned(format!("{}", f.fmt2(tax_amount))),
+            Cow::Owned(format!("{}", f.fmt2(running_balance))),
         ]);
     }
 
