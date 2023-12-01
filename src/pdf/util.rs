@@ -31,6 +31,7 @@ pub struct Transaction {
     trans_type: String,
     amount: f64,
     running_balance: f64,
+    running_shares: f64,
     shares: Option<f64>,
     price: Option<f64>,
     netamount: f64,
@@ -49,11 +50,30 @@ pub struct Summation {
     total_interest: f64,
 }
 
+pub struct BFSummation {
+    total_purchase_units: f64,
+    total_purchase_costs: f64,
+    total_sale_units: f64,
+    total_sale_costs: f64,
+    total_balance_units: f64,
+    latest_nav: f64,
+    total_running_bal: f64,
+    closing_date: DateTime<Utc>,
+}
+
 pub fn create_pdf(data: Vec<Transaction>, pdf_name: String, mmf: bool) {
     let (w, h) = (210.0, 297.0);
-    let total_pages = 2;
+    let data_len = data.len();
 
-    let pdf_name = "test";
+    let first_page_size = 26;
+    let per_page = 31;
+
+    let total_pages: i64 = if data_len <= first_page_size {
+        1
+    } else {
+        let pages = ((data_len - first_page_size) as f64 / per_page as f64).ceil() as i64 + 1;
+        pages
+    };
 
     let margin_top = Mm(10.0);
     let margin_bottom = Mm(10.0);
@@ -67,6 +87,46 @@ pub fn create_pdf(data: Vec<Transaction>, pdf_name: String, mmf: bool) {
 
     let default_font = doc.add_builtin_font(BuiltinFont::Helvetica).unwrap();
     let bold_font = doc.add_builtin_font(BuiltinFont::HelveticaBold).unwrap();
+    let user_details = &data[0];
+
+    let total_running_bal: f64 = data[data_len - 1].running_balance;
+    let total_taxs: f64 = data.iter().map(|t| t.taxamt).sum();
+    let total_deposits: f64 = data.iter().map(|t| t.p_amount).sum();
+    let total_withdrawal: f64 = data.iter().map(|t| t.w_amount).sum();
+    let total_interest: f64 = data.iter().map(|t| t.i_amount).sum();
+
+    let total_purchase_units: f64 = data
+        .iter()
+        .map(|t| match t.trans_type.as_str() {
+            "PURCHASE" => t.shares.unwrap(),
+            _ => 0.0,
+        })
+        .sum();
+    let total_purchase_costs: f64 = data
+        .iter()
+        .map(|t| match t.trans_type.as_str() {
+            "PURCHASE" => t.amount,
+            _ => 0.0,
+        })
+        .sum();
+    let total_sale_units: f64 = data
+        .iter()
+        .map(|t| match t.trans_type.as_str() {
+            "WITHDRAWAL" => t.shares.unwrap(),
+            _ => 0.0,
+        })
+        .sum();
+
+    let total_sale_costs: f64 = data
+        .iter()
+        .map(|t| match t.trans_type.as_str() {
+            "WITHDRAWAL" => t.amount,
+            _ => 0.0,
+        })
+        .sum();
+    let total_balance_units = data[data_len - 1].running_shares;
+    let latest_nav: f64 = data[data_len - 1].price.unwrap();
+    let closing_date = data[data_len - 1].trans_date;
 
     for p in 0..total_pages {
         let current_layer: PdfLayerReference = if p == 0 {
@@ -86,31 +146,7 @@ pub fn create_pdf(data: Vec<Transaction>, pdf_name: String, mmf: bool) {
                 usable_height,
                 margin_top,
                 margin_left,
-                &Transaction {
-                    member_no: "0000".to_owned(),
-                    town: "Nairobi".to_owned(),
-                    e_mail: "Jk@gmail.com".to_owned(),
-                    allnames: "Kaamil Too".to_owned(),
-                    post_address: "".to_owned(),
-                    gsm_no: "254724765149".to_owned(),
-                    descript: "Money Market".to_owned(),
-                    security_code: "002".to_owned(),
-                    trans_id: 1234,
-                    trans_date: Utc::now(),
-                    account_no: "account_no".to_owned(),
-                    taxamt: 0.0,
-                    trans_type: "Purchase".to_owned(),
-                    amount: 0.0,
-                    running_balance: 0.0,
-                    shares: Some(0.0),
-                    price: Some(0.0),
-                    netamount: 0.0,
-                    mop: "MPESA".to_owned(),
-                    currency: "KEs".to_owned(),
-                    p_amount: 0.0,
-                    w_amount: 0.0,
-                    i_amount: 0.0,
-                },
+                &user_details,
             )
         }
 
@@ -129,47 +165,106 @@ pub fn create_pdf(data: Vec<Transaction>, pdf_name: String, mmf: bool) {
 
         if mmf {
             if p == 0 {
+                let first_page_trans: Vec<Transaction> =
+                    data.iter().skip(0).take(first_page_size).cloned().collect();
                 gen_table_mmf(
                     current_layer,
-                    h - 70.0,
+                    h - 66.0,
                     &default_font,
                     &bold_font,
-                    data.clone(),
+                    first_page_trans,
                     if total_pages == 1 { true } else { false },
                     Summation {
-                        total_running_bal: 0.0,
-                        total_taxs: 0.0,
-                        total_deposits: 0.0,
-                        total_withdrawal: 0.0,
-                        total_interest: 0.0,
+                        total_running_bal,
+                        total_taxs,
+                        total_deposits,
+                        total_withdrawal,
+                        total_interest,
                     },
                 );
             } else {
+                let trans_data: Vec<Transaction> =
+                    data.iter().skip(first_page_size).cloned().collect();
+                let start_index = per_page * (p - 1) as usize;
+
+                let trans: Vec<Transaction> = trans_data
+                    .iter()
+                    .skip(start_index)
+                    .take(per_page)
+                    .cloned()
+                    .collect();
                 gen_table_mmf(
                     current_layer,
                     h - 22.0,
                     &default_font,
                     &bold_font,
-                    data.clone(),
-                    if total_pages == 1 { true } else { false },
+                    trans,
+                    if p + 1 == total_pages { true } else { false },
                     Summation {
-                        total_running_bal: 0.0,
-                        total_taxs: 0.0,
-                        total_deposits: 0.0,
-                        total_withdrawal: 0.0,
-                        total_interest: 0.0,
+                        total_running_bal,
+                        total_taxs,
+                        total_deposits,
+                        total_withdrawal,
+                        total_interest,
                     },
                 );
             }
         } else {
             if p == 0 {
-                gen_table(current_layer, h - 70.0, &default_font, &bold_font);
+                let first_page_trans: Vec<Transaction> =
+                    data.iter().take(first_page_size).cloned().collect();
+                gen_table(
+                    current_layer,
+                    h - 60.0,
+                    &default_font,
+                    &bold_font,
+                    first_page_trans,
+                    if total_pages == 1 { true } else { false },
+                    BFSummation {
+                        total_purchase_units,
+                        total_purchase_costs,
+                        total_sale_units,
+                        total_sale_costs,
+                        total_balance_units,
+                        latest_nav,
+                        total_running_bal,
+                        closing_date,
+                    },
+                );
             } else {
-                gen_table(current_layer, h - 22.0, &default_font, &bold_font);
+                let trans_data: Vec<Transaction> =
+                    data.iter().skip(first_page_size).cloned().collect();
+                let start_index = per_page * (p - 1) as usize;
+
+                let trans: Vec<Transaction> = trans_data
+                    .iter()
+                    .skip(start_index)
+                    .take(per_page)
+                    .cloned()
+                    .collect();
+                gen_table(
+                    current_layer,
+                    h - 22.0,
+                    &default_font,
+                    &bold_font,
+                    trans,
+                    if p + 1 == total_pages { true } else { false },
+                    BFSummation {
+                        total_purchase_units,
+                        total_purchase_costs,
+                        total_sale_units,
+                        total_sale_costs,
+                        total_balance_units,
+                        latest_nav,
+                        total_running_bal,
+                        closing_date,
+                    },
+                );
             }
         }
     }
-    let mut writer = BufWriter::new(File::create(format!("{}-temp.pdf", pdf_name)).unwrap());
+    let mut writer =
+        BufWriter::new(File::create(format!("storage/{}-temp.pdf", pdf_name)).unwrap());
 
     doc.with_conformance(PdfConformance::X3_2003_PDF_1_4)
         .save(&mut writer)
@@ -270,8 +365,8 @@ fn page_header(
     layer: PdfLayerReference,
     usable_height: Mm,
     usable_width: Mm,
-    page: usize,
-    total_pages: usize,
+    page: i64,
+    total_pages: i64,
     font: &IndirectFontRef,
 ) {
     let logo = load_logo();
@@ -290,7 +385,7 @@ fn page_header(
         format!("page {}/{}", page, total_pages),
         7.0,
         usable_width - Mm(0.00),
-        usable_height + Mm(10.0),
+        usable_height + Mm(7.0),
         font,
     );
 }
@@ -303,7 +398,7 @@ fn page_footer(layer: PdfLayerReference, usable_width: Mm, font: &IndirectFontRe
         let text_width = line.len();
         let center_x = (usable_width - Mm(text_width as f32)) / 2.0;
         let y = Mm(9.0) - Mm(i as f32 * 3.0);
-        layer.use_text(line.to_string(), 7.0, center_x, y, font)
+        layer.use_text(line.to_string(), 6.5, center_x, y, font)
     }
 }
 

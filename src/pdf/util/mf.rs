@@ -116,7 +116,7 @@ pub fn gen_table_mmf(
                 current_layer.add_line(line);
                 current_layer.use_text(
                     cell_data.to_string(),
-                    8.0,
+                    7.5,
                     Mm(x) + Mm(5.0),
                     Mm(y),
                     bold_font,
