@@ -40,6 +40,7 @@ pub struct Transaction {
     p_amount: f64,
     w_amount: f64,
     i_amount: f64,
+    statement: String,
 }
 
 pub struct Summation {
@@ -57,7 +58,6 @@ pub struct BFSummation {
     total_sale_costs: f64,
     total_balance_units: f64,
     latest_nav: f64,
-    total_running_bal: f64,
     closing_date: DateTime<Utc>,
 }
 
@@ -150,7 +150,12 @@ pub fn create_pdf(data: Vec<Transaction>, pdf_name: String, mmf: bool) {
             )
         }
 
-        page_footer(current_layer.clone(), usable_width, &default_font);
+        page_footer(
+            current_layer.clone(),
+            usable_width,
+            &default_font,
+            user_details,
+        );
 
         if p > 0 {
             page_header(
@@ -227,7 +232,6 @@ pub fn create_pdf(data: Vec<Transaction>, pdf_name: String, mmf: bool) {
                         total_sale_costs,
                         total_balance_units,
                         latest_nav,
-                        total_running_bal,
                         closing_date,
                     },
                 );
@@ -256,7 +260,6 @@ pub fn create_pdf(data: Vec<Transaction>, pdf_name: String, mmf: bool) {
                         total_sale_costs,
                         total_balance_units,
                         latest_nav,
-                        total_running_bal,
                         closing_date,
                     },
                 );
@@ -350,9 +353,10 @@ fn main_header(
 
     current_layer.use_text(
         format!(
-            "{} | {}",
+            "{} | {} | {}",
             user_details.descript,
-            Utc::now().format("%d-%m-%Y")
+            Utc::now().format("%d-%m-%Y"),
+            user_details.currency
         ),
         9.0,
         usable_width - Mm(40.0),
@@ -390,8 +394,13 @@ fn page_header(
     );
 }
 
-fn page_footer(layer: PdfLayerReference, usable_width: Mm, font: &IndirectFontRef) {
-    let paragraph = "Bank account details: CO-OP Bank, CIC Dollar Fund Collection account, Acct No: 02120190806600 Branch: CO-OP House, Swift Code:KCOOKENA. Remember to always quote your Member No. indicated at the top right hand corner.";
+fn page_footer(
+    layer: PdfLayerReference,
+    usable_width: Mm,
+    font: &IndirectFontRef,
+    fund_details: &Transaction,
+) {
+    let paragraph = &fund_details.statement;
 
     let wrapped_text = wrap(paragraph, 100);
     for (i, line) in wrapped_text.iter().enumerate() {
@@ -422,4 +431,12 @@ fn load_logo() -> Image {
 fn load_image(image_path: &str) -> DynamicImage {
     let img = open(&Path::new(image_path)).unwrap();
     img
+}
+
+fn round_decimal(num: f64) -> String {
+    let rounded_number = (num * 100.0 as f64).round() / 100.0;
+    // Format the rounded number with two decimal places
+    let formatted_number = format!("{:.2}", rounded_number);
+
+    formatted_number
 }

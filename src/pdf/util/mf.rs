@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use numfmt::Formatter;
+use numfmt::{Formatter, Scales};
 use printpdf::{Color, IndirectFontRef, Line, Mm, PdfLayerReference, Point, Rgb};
 
 use super::{Summation, Transaction};
@@ -38,17 +38,18 @@ pub fn gen_table_mmf(
     let mut f = Formatter::new()
         .separator(',')
         .unwrap()
+        .scales(Scales::none())
         .precision(numfmt::Precision::Decimals(2));
 
     let sum_data: Vec<Vec<Cow<str>>> = vec![vec![
         Cow::Borrowed("Summations"),
         Cow::Borrowed(""),
         Cow::Borrowed(""),
-        Cow::Owned(format!("{}", f.fmt2(sums.total_deposits))),
-        Cow::Owned(format!("{}", f.fmt2(sums.total_interest))),
-        Cow::Owned(format!("{}", f.fmt2(sums.total_withdrawal.abs()))),
-        Cow::Owned(format!("{}", f.fmt2(sums.total_taxs.abs()))),
-        Cow::Owned(format!("{}", f.fmt2(sums.total_running_bal))),
+        Cow::Owned(format!("{}", f.fmt2(sums.total_deposits.round()))),
+        Cow::Owned(format!("{}", f.fmt2(sums.total_interest.round()))),
+        Cow::Owned(format!("{}", f.fmt2(sums.total_withdrawal.abs().round()))),
+        Cow::Owned(format!("{}", f.fmt2(sums.total_taxs.abs().round()))),
+        Cow::Owned(format!("{}", f.fmt2(sums.total_running_bal.round()))),
     ]];
 
     for transaction in transactions.iter() {
@@ -57,7 +58,7 @@ pub fn gen_table_mmf(
         let trans_id = trans.trans_id.to_string();
         let trans_type = &trans.trans_type;
 
-        let amount = trans.amount.clone();
+        let amount = trans.amount.clone().round();
 
         let deposit = if trans_type == "PURCHASE" {
             format!("{}", f.fmt2(amount))
@@ -87,8 +88,8 @@ pub fn gen_table_mmf(
             Cow::Owned(deposit),
             Cow::Owned(interest),
             Cow::Owned(withdrawal),
-            Cow::Owned(format!("{}", f.fmt2(tax_amount))),
-            Cow::Owned(format!("{}", f.fmt2(running_balance))),
+            Cow::Owned(format!("{}", f.fmt2(tax_amount.round()))),
+            Cow::Owned(format!("{}", f.fmt2(running_balance.round()))),
         ]);
     }
 
