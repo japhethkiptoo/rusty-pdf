@@ -3,12 +3,17 @@ mod mf;
 
 use ::image::{open, DynamicImage};
 use chrono::{DateTime, Utc};
+use numfmt::Formatter;
 use printpdf::{
     BuiltinFont, Image, ImageTransform, ImageXObject, IndirectFontRef, Mm, PdfConformance,
     PdfDocument, PdfLayerReference, Px,
 };
 use serde::{Deserialize, Serialize};
-use std::{fs::File, io::BufWriter, path::Path};
+use std::{
+    fs::File,
+    io::{self, BufWriter},
+    path::Path,
+};
 use textwrap::wrap;
 
 use bf::gen_table;
@@ -65,6 +70,10 @@ pub fn create_pdf(data: Vec<Transaction>, pdf_name: String, mmf: bool) {
     let (w, h) = (210.0, 297.0);
     let data_len = data.len();
 
+    if data_len < 1 {
+        panic!("Data Error")
+    }
+
     let first_page_size = 26;
     let per_page = 31;
 
@@ -87,7 +96,7 @@ pub fn create_pdf(data: Vec<Transaction>, pdf_name: String, mmf: bool) {
 
     let default_font = doc.add_builtin_font(BuiltinFont::Helvetica).unwrap();
     let bold_font = doc.add_builtin_font(BuiltinFont::HelveticaBold).unwrap();
-    let user_details = &data[0];
+    let user_details = &data[data_len - 1];
 
     let total_running_bal: f64 = data[data_len - 1].running_balance;
     let total_taxs: f64 = data.iter().map(|t| t.taxamt).sum();
@@ -119,7 +128,7 @@ pub fn create_pdf(data: Vec<Transaction>, pdf_name: String, mmf: bool) {
 
     let total_sale_costs: f64 = data
         .iter()
-        .map(|t| match t.trans_type.as_str() {
+        .map(|t: &Transaction| match t.trans_type.as_str() {
             "WITHDRAWAL" => t.amount,
             _ => 0.0,
         })
@@ -220,7 +229,7 @@ pub fn create_pdf(data: Vec<Transaction>, pdf_name: String, mmf: bool) {
                     data.iter().take(first_page_size).cloned().collect();
                 gen_table(
                     current_layer,
-                    h - 60.0,
+                    h - 59.0,
                     &default_font,
                     &bold_font,
                     first_page_trans,
@@ -355,7 +364,7 @@ fn main_header(
         format!(
             "{} | {} | {}",
             user_details.descript,
-            Utc::now().format("%d-%m-%Y"),
+            user_details.trans_date.format("%d-%m-%Y"),
             user_details.currency
         ),
         9.0,
@@ -433,10 +442,30 @@ fn load_image(image_path: &str) -> DynamicImage {
     img
 }
 
-fn round_decimal(num: f64) -> String {
+pub fn round_decimal(num: f64) -> String {
+    if has_leading_zeros_after_decimal(num) && num < 1.0 {
+        let rounded_number = (num * 10000.0 as f64).round() / 10000.0;
+        let final_num = format!("{:.4}", rounded_number);
+        return final_num;
+    }
     let rounded_number = (num * 100.0 as f64).round() / 100.0;
-    // Format the rounded number with two decimal places
-    let formatted_number = format!("{:.2}", rounded_number);
+    let mut f: Formatter;
+    f = "[.2n/,]".parse().unwrap();
+    let formatted_number = format!("{}", f.fmt2(rounded_number));
 
-    formatted_number
+    return formatted_number;
+}
+
+fn has_leading_zeros_after_decimal(number: f64) -> bool {
+    let num_str = number.to_string();
+
+    if let Some(decimal_position) = num_str.find('.') {
+        let decimal_part = &num_str[decimal_position + 1..];
+
+        if decimal_part.chars().take_while(|&c| c == '0').count() >= 2 {
+            return true;
+        }
+    }
+
+    false
 }

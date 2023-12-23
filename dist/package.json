@@ -1,0 +1,12 @@
+{
+    "name": "full_statement",
+    "version": "0.1.3",
+    "files": [
+        "index.node",
+        "lib.js",
+        "lib.d.ts"
+    ],
+    "module": "lib.js",
+    "main": "lib.js",
+    "types": "lib.d.ts"
+}

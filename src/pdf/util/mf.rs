@@ -1,9 +1,8 @@
 use std::borrow::Cow;
 
-use numfmt::{Formatter, Scales};
 use printpdf::{Color, IndirectFontRef, Line, Mm, PdfLayerReference, Point, Rgb};
 
-use super::{Summation, Transaction};
+use super::{round_decimal, Summation, Transaction};
 
 pub fn gen_table_mmf(
     current_layer: PdfLayerReference,
@@ -35,21 +34,15 @@ pub fn gen_table_mmf(
         Cow::Borrowed("Running Balance"),
     ]];
 
-    let mut f = Formatter::new()
-        .separator(',')
-        .unwrap()
-        .scales(Scales::none())
-        .precision(numfmt::Precision::Decimals(2));
-
     let sum_data: Vec<Vec<Cow<str>>> = vec![vec![
         Cow::Borrowed("Summations"),
         Cow::Borrowed(""),
         Cow::Borrowed(""),
-        Cow::Owned(format!("{}", f.fmt2(sums.total_deposits.round()))),
-        Cow::Owned(format!("{}", f.fmt2(sums.total_interest.round()))),
-        Cow::Owned(format!("{}", f.fmt2(sums.total_withdrawal.abs().round()))),
-        Cow::Owned(format!("{}", f.fmt2(sums.total_taxs.abs().round()))),
-        Cow::Owned(format!("{}", f.fmt2(sums.total_running_bal.round()))),
+        Cow::Owned(format!("{}", round_decimal(sums.total_deposits))),
+        Cow::Owned(format!("{}", round_decimal(sums.total_interest))),
+        Cow::Owned(format!("{}", round_decimal(sums.total_withdrawal.abs()))),
+        Cow::Owned(format!("{}", round_decimal(sums.total_taxs.abs()))),
+        Cow::Owned(format!("{}", round_decimal(sums.total_running_bal))),
     ]];
 
     for transaction in transactions.iter() {
@@ -58,28 +51,34 @@ pub fn gen_table_mmf(
         let trans_id = trans.trans_id.to_string();
         let trans_type = &trans.trans_type;
 
-        let amount = trans.amount.clone().round();
+        let amount = trans.amount.clone();
 
         let deposit = if trans_type == "PURCHASE" {
-            format!("{}", f.fmt2(amount))
+            round_decimal(amount)
         } else {
             "".to_string()
         };
 
         let withdrawal = if trans_type == "WITHDRAWAL" {
-            format!("{}", f.fmt2(amount))
+            round_decimal(amount)
         } else {
             "".to_string()
         };
 
         let interest = if trans_type == "INTEREST" {
-            format!("{}", f.fmt2(amount))
+            round_decimal(amount)
         } else {
             "".to_string()
         };
 
-        let tax_amount = trans.taxamt.clone();
+        // let tax_amount = trans.taxamt.clone();
         let running_balance = trans.running_balance.clone();
+
+        let tax_amount = if trans.taxamt.clone() != 0.0 {
+            round_decimal(trans.taxamt.clone())
+        } else {
+            "".to_string()
+        };
 
         data.push(vec![
             Cow::Owned(trans_id),
@@ -88,8 +87,8 @@ pub fn gen_table_mmf(
             Cow::Owned(deposit),
             Cow::Owned(interest),
             Cow::Owned(withdrawal),
-            Cow::Owned(format!("{}", f.fmt2(tax_amount.round()))),
-            Cow::Owned(format!("{}", f.fmt2(running_balance.round()))),
+            Cow::Owned(tax_amount),
+            Cow::Owned(round_decimal(running_balance)),
         ]);
     }
 

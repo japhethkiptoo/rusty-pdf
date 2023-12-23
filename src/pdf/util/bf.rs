@@ -1,7 +1,6 @@
-use numfmt::{Formatter, Scales};
 use printpdf::{Color, IndirectFontRef, Line, Mm, PdfLayerReference, Point, Rgb};
 
-use super::{BFSummation, Transaction};
+use super::{round_decimal, BFSummation, Transaction};
 
 pub fn gen_table(
     layer: PdfLayerReference,
@@ -40,12 +39,6 @@ pub fn gen_table(
     let gray = Rgb::new(230.0 / 256.0, 230.0 / 256.0, 230.0 / 256.0, None);
 
     let colors = table_colors();
-
-    let mut f = Formatter::new()
-        .separator(',')
-        .unwrap()
-        .scales(Scales::none());
-    // .precision(numfmt::Precision::Decimals(2));
 
     for (row_index, _row_data) in (0..1).enumerate() {
         for (col_index, header) in ["", "Purchases", "Sales", "Balance"].iter().enumerate() {
@@ -149,7 +142,7 @@ pub fn gen_table(
                 3 => {
                     if trans.trans_type == "PURCHASE" {
                         layer.use_text(
-                            format!("{}", trans.shares.unwrap()),
+                            format!("{}", round_decimal(trans.shares.unwrap())),
                             7.0,
                             Mm(x),
                             Mm(y),
@@ -159,18 +152,30 @@ pub fn gen_table(
                 }
                 4 => {
                     if trans.trans_type == "PURCHASE" {
-                        layer.use_text(format!("{}", trans.price.unwrap()), 7.0, Mm(x), Mm(y), font)
+                        layer.use_text(
+                            format!("{}", round_decimal(trans.price.unwrap())),
+                            7.0,
+                            Mm(x),
+                            Mm(y),
+                            font,
+                        )
                     }
                 }
                 5 => {
                     if trans.trans_type == "PURCHASE" {
-                        layer.use_text(format!("{}", trans.amount), 7.0, Mm(x), Mm(y), font)
+                        layer.use_text(
+                            format!("{}", round_decimal(trans.amount)),
+                            7.0,
+                            Mm(x),
+                            Mm(y),
+                            font,
+                        )
                     }
                 }
                 6 => {
                     if trans.trans_type == "WITHDRAWAL" {
                         layer.use_text(
-                            format!("{}", trans.shares.unwrap()),
+                            format!("{}", round_decimal(trans.shares.unwrap())),
                             7.0,
                             Mm(x),
                             Mm(y),
@@ -180,13 +185,19 @@ pub fn gen_table(
                 }
                 7 => {
                     if trans.trans_type == "WITHDRAWAL" {
-                        layer.use_text(format!("{}", trans.price.unwrap()), 7.0, Mm(x), Mm(y), font)
+                        layer.use_text(
+                            format!("{}", round_decimal(trans.price.unwrap())),
+                            7.0,
+                            Mm(x),
+                            Mm(y),
+                            font,
+                        )
                     }
                 }
                 8 => {
                     if trans.trans_type == "WITHDRAWAL" {
                         layer.use_text(
-                            format!("{}", trans.amount), //cost
+                            format!("{}", round_decimal(trans.amount)), //cost
                             7.0,
                             Mm(x),
                             Mm(y),
@@ -195,13 +206,19 @@ pub fn gen_table(
                     }
                 }
                 9 => layer.use_text(
-                    format!("{}", trans.running_shares),
+                    format!("{}", round_decimal(trans.running_shares)),
                     7.0,
                     Mm(x),
                     Mm(y),
                     font,
                 ),
-                10 => layer.use_text(format!("{}", trans.price.unwrap()), 7.0, Mm(x), Mm(y), font),
+                10 => layer.use_text(
+                    format!("{}", round_decimal(trans.price.unwrap())),
+                    7.0,
+                    Mm(x),
+                    Mm(y),
+                    font,
+                ),
                 _ => println!(""),
             }
 
@@ -240,7 +257,7 @@ pub fn gen_table(
                         1 => (),
                         2 => (),
                         3 => layer.use_text(
-                            format!("{}", sums.total_purchase_units),
+                            format!("{}", round_decimal(sums.total_purchase_units)),
                             7.0,
                             Mm(x),
                             Mm(y),
@@ -248,14 +265,14 @@ pub fn gen_table(
                         ),
                         4 => (),
                         5 => layer.use_text(
-                            format!("{}", sums.total_purchase_costs),
+                            format!("{}", round_decimal(sums.total_purchase_costs)),
                             7.0,
                             Mm(x),
                             Mm(y),
                             font,
                         ),
                         6 => layer.use_text(
-                            format!("{}", sums.total_sale_units),
+                            format!("{}", round_decimal(sums.total_sale_units)),
                             7.0,
                             Mm(x),
                             Mm(y),
@@ -263,22 +280,26 @@ pub fn gen_table(
                         ),
                         7 => (),
                         8 => layer.use_text(
-                            format!("{}", sums.total_sale_costs),
+                            format!("{}", round_decimal(sums.total_sale_costs)),
                             7.0,
                             Mm(x),
                             Mm(y),
                             font,
                         ),
                         9 => layer.use_text(
-                            format!("{}", sums.total_balance_units),
+                            format!("{}", round_decimal(sums.total_balance_units)),
                             7.0,
                             Mm(x),
                             Mm(y),
                             font,
                         ),
-                        10 => {
-                            layer.use_text(format!("{}", sums.latest_nav), 7.0, Mm(x), Mm(y), font)
-                        }
+                        10 => layer.use_text(
+                            format!("{}", round_decimal(sums.latest_nav)),
+                            7.0,
+                            Mm(x),
+                            Mm(y),
+                            font,
+                        ),
                         _ => (),
                     }
 
@@ -303,7 +324,13 @@ pub fn gen_table(
                         6 => (),
                         7 => (),
                         8 => layer.use_text("Market Value:", 7.0, Mm(x), Mm(y), font),
-                        9 => layer.use_text(format!("{}", bal), 7.0, Mm(x), Mm(y), font),
+                        9 => layer.use_text(
+                            format!("{}", round_decimal(bal)),
+                            7.0,
+                            Mm(x),
+                            Mm(y),
+                            font,
+                        ),
                         10 => (),
                         _ => (),
                     }
