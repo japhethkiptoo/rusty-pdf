@@ -83,7 +83,7 @@ pub fn gen_table_mmf(
         data.push(vec![
             Cow::Owned(trans_id),
             Cow::Owned(trans_date),
-            Cow::Borrowed(""),
+            Cow::Borrowed(trans.mop.as_str()),
             Cow::Owned(deposit),
             Cow::Owned(interest),
             Cow::Owned(withdrawal),

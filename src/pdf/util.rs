@@ -9,11 +9,7 @@ use printpdf::{
     PdfDocument, PdfLayerReference, Px,
 };
 use serde::{Deserialize, Serialize};
-use std::{
-    fs::File,
-    io::{self, BufWriter},
-    path::Path,
-};
+use std::{fs::File, io::BufWriter, path::Path};
 use textwrap::wrap;
 
 use bf::gen_table;
@@ -275,8 +271,14 @@ pub fn create_pdf(data: Vec<Transaction>, pdf_name: String, mmf: bool) {
             }
         }
     }
-    let mut writer =
-        BufWriter::new(File::create(format!("storage/{}-temp.pdf", pdf_name)).unwrap());
+    let member_no = match &user_details.member_no {
+        m_no => m_no,
+        _ => "n_member_no",
+    };
+
+    let mut writer = BufWriter::new(
+        File::create(format!("storage/{}/{}-temp.pdf", member_no, pdf_name)).unwrap(),
+    );
 
     doc.with_conformance(PdfConformance::X3_2003_PDF_1_4)
         .save(&mut writer)
