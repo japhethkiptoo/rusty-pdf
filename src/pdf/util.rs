@@ -450,10 +450,10 @@ pub fn round_decimal(num: f64) -> String {
         let final_num = format!("{:.4}", rounded_number);
         return final_num;
     }
-    let rounded_number = (num * 100.0 as f64).round() / 100.0;
+    // let rounded_number = (num * 100.0 as f64).round() / 100.0;
     let mut f: Formatter;
     f = "[.2n/,]".parse().unwrap();
-    let formatted_number = format!("{}", f.fmt2(rounded_number));
+    let formatted_number = format!("{}", f.fmt2(num));
 
     return formatted_number;
 }

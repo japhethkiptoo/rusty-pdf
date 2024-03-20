@@ -5,7 +5,7 @@ fs.generateStatement(
     transactions: [
       {
         amount: 100,
-        member_no: "00019",
+        member_no: "00020",
         town: "Litein",
         e_mail: "jk@gmail.com",
         allnames: "Japheth Kiptoo",
@@ -15,10 +15,10 @@ fs.generateStatement(
         security_code: "001",
         trans_id: 2324,
         trans_date: new Date(),
-        account_no: "001-00019-001",
+        account_no: "001-00020-001",
         taxamt: 0,
         trans_type: "WITHDRAWAL",
-        running_balance: 1000,
+        running_balance: 0.00058986,
         running_shares: 0,
         netamount: 0,
         mop: "M-PESA",
@@ -33,7 +33,7 @@ fs.generateStatement(
     ],
     pdf_name: "test",
   }),
-  false
+  true
 )
   .then(() => {
     console.log("success");
